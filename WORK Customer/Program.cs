@@ -2,12 +2,14 @@ using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 
+// TEXT: Programmet skriver ut sökvägen till SQLite-databasen och initierar DbContext
 Console.WriteLine("DB: " + Path.Combine(AppContext.BaseDirectory, "ecommerce.db"));
 
 using var db = new WORK_Customer.ECommerceContext();
+// TEXT: Säkerställer att databasen existerar och skapar den om den saknas (lämpligt för utveckling)
 await db.Database.EnsureCreatedAsync();
 
-// Seed
+// TEXT: Seed - lägger till några initiala kategorier och produkter om tabellerna är tomma
 if (!await db.Categories.AnyAsync())
 {
     db.Categories.AddRange(
@@ -28,7 +30,7 @@ if (!await db.Products.AnyAsync())
     Console.WriteLine("Seeded products");
 }
 
-// Main CLI
+// TEXT: Huvudloopen för enkel CLI. Användaren väljer en sektion att jobba med.
 while (true)
 {
     Console.WriteLine();
@@ -57,8 +59,8 @@ while (true)
 }
 
 
-
-// Customers
+// TEXT: ----- CUSTOMERS -----
+// TEXT: Meny för kundhantering - lista, lägg till, redigera, ta bort
 async Task CustomersMenu()
 {
     while (true)
@@ -78,7 +80,7 @@ async Task CustomersMenu()
     }
 }
 
-
+// TEXT: Hämtar och skriver ut alla kunder. Använder AsNoTracking för bättre läsprestanda.
 async Task ListCustomers()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
@@ -86,9 +88,11 @@ async Task ListCustomers()
     var rows = await ctx.Customers.AsNoTracking().OrderBy(c => c.CustomerId).ToListAsync();
     sw.Stop();
     foreach (var r in rows) Console.WriteLine($"{r.CustomerId} | {r.CustomerName} {r.LastName} | {r.Email}");
+    // TEXT: Visar hur lång frågan tog
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
 }
 
+// TEXT: Lägger till en kund med grundläggande validering av inmatningen
 async Task AddCustomer()
 {
     Console.Write("First name: ");
@@ -115,6 +119,7 @@ async Task AddCustomer()
         CustomerName = first,
         LastName = last,
         Email = email,
+        // TEXT: I denna version lagras lösenord i klartext enligt användarens önskemål 
         Password = password
     };
     ctx.Customers.Add(c);
@@ -122,6 +127,7 @@ async Task AddCustomer()
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
+// TEXT: Redigera befintlig kund - läser in nya värden och sparar
 async Task EditCustomer()
 {
     Console.Write("CustomerId to edit: ");
@@ -142,6 +148,7 @@ async Task EditCustomer()
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
+// TEXT: Ta bort kund efter bekräftelse. Tar bort raden från databasen.
 async Task DeleteCustomer()
 {
     Console.Write("CustomerId to delete: ");
@@ -157,7 +164,7 @@ async Task DeleteCustomer()
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Categories
+// TEXT: ----- CATEGORIES -----
 async Task CategoriesMenu()
 {
     while (true)
@@ -176,6 +183,7 @@ async Task CategoriesMenu()
     }
 }
 
+// TEXT: Redigera kategori
 async Task EditCategory()
 {
     Console.Write("CategoryId to edit: ");
@@ -190,7 +198,7 @@ async Task EditCategory()
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Products
+// TEXT: ----- PRODUCTS -----
 async Task ProductsMenu()
 {
     while (true)
@@ -209,6 +217,7 @@ async Task ProductsMenu()
     }
 }
 
+// TEXT: Redigera produkt
 async Task EditProduct()
 {
     Console.Write("Product id to edit: ");
@@ -227,7 +236,7 @@ async Task EditProduct()
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Orders
+// TEXT: ----- ORDERS -----
 async Task OrdersMenu()
 {
     while (true)
@@ -247,6 +256,7 @@ async Task OrdersMenu()
     }
 }
 
+// TEXT: Lista produkter - mät tid
 async Task ListProducts() // overload used by menus
 {
     using var ctx = new WORK_Customer.ECommerceContext();
@@ -257,6 +267,7 @@ async Task ListProducts() // overload used by menus
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
 }
 
+// TEXT: Lista ordrar med inkluderad kund
 async Task ListOrders()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
@@ -267,6 +278,7 @@ async Task ListOrders()
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
 }
 
+// TEXT: Visa en order och dess rader inklusive produktinfo
 async Task ViewOrder()
 {
     Console.Write("OrderId to view: ");
@@ -284,6 +296,7 @@ async Task ViewOrder()
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
 }
 
+// TEXT: Skapa order genom att lägga till rader interaktivt, spara i transaktion
 async Task AddOrder()
 {
     Console.Write("CustomerId for order: ");
@@ -338,6 +351,7 @@ async Task AddOrder()
     }
 }
 
+// TEXT: Rensa alla ordrar och orderrader (farligt - används för test)
 async Task ClearOrders()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
@@ -363,7 +377,7 @@ async Task ClearOrders()
     }
 }
 
-// Existing simple category/product list functions kept for compatibility
+// TEXT: ----- CATEGORIES/PRODUCTS HELPERS -----
 async Task ListCategories()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
