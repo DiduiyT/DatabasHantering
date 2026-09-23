@@ -1,16 +1,16 @@
 using System;
 using System.Linq;
-using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using WORK_Customer.Security;
 
-// Visar sökvägen till SQLite-databasen (för felsökning) och initierar DbContext.
+// Visar sï¿½kvï¿½gen till SQLite-databasen (fï¿½r felsï¿½kning) och initierar DbContext.
 Console.WriteLine("DB: " + Path.Combine(AppContext.BaseDirectory, "ecommerce.db"));
 
 using var db = new WORK_Customer.ECommerceContext();
-// Ser till att databasen finns — skapar den automatiskt om den saknas. Praktiskt under utveckling.
+// Ser till att databasen finns ï¿½ skapar den automatiskt om den saknas. Praktiskt under utveckling.
 await db.Database.EnsureCreatedAsync();
 
-// Seed: lägger till exempeldata i kategorier och produkter om tabellerna är tomma.
+// Seed: lï¿½gger till exempeldata i kategorier och produkter om tabellerna ï¿½r tomma.
 if (!await db.Categories.AnyAsync())
 {
     db.Categories.AddRange(
@@ -31,7 +31,7 @@ if (!await db.Products.AnyAsync())
     Console.WriteLine("Seeded products");
 }
 
-// Enkel kommandoradsmeny. Välj vilken del av appen du vill arbeta med.
+// Enkel kommandoradsmeny. Vï¿½lj vilken del av appen du vill arbeta med.
 while (true)
 {
     Console.WriteLine();
@@ -61,7 +61,7 @@ while (true)
 
 
 // ----- Kundhantering -----
-// Kundmeny: listar, lägger till, redigerar och tar bort kunder.
+// Kundmeny: listar, lï¿½gger till, redigerar och tar bort kunder.
 async Task CustomersMenu()
 {
     while (true)
@@ -81,49 +81,26 @@ async Task CustomersMenu()
     }
 }
 
-// Hämtar alla kunder utan tracking (AsNoTracking) för snabbare läsning och skriver ut dem.
+// Hï¿½mtar alla kunder utan tracking (AsNoTracking) fï¿½r snabbare lï¿½sning och skriver ut dem.
 async Task ListCustomers()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
+    Console.Write("Search name or email (blank for all): ");
+    var search = (Console.ReadLine() ?? string.Empty).Trim();
     var sw = System.Diagnostics.Stopwatch.StartNew();
-    var rows = await ctx.Customers.AsNoTracking().OrderBy(c => c.CustomerId).ToListAsync();
+    var query = ctx.Customers.AsNoTracking();
+    if (!string.IsNullOrWhiteSpace(search))
+        query = query.Where(c => c.CustomerName.Contains(search) || c.LastName.Contains(search) || c.Email.Contains(search));
+    var rows = await query.OrderBy(c => c.CustomerId).ToListAsync();
     sw.Stop();
     foreach (var r in rows) Console.WriteLine($"{r.CustomerId} | {r.CustomerName} {r.LastName} | {r.Email}");
-    // Visar hur lång tid frågan tog
+    // Visar hur lï¿½ng tid frï¿½gan tog
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
 }
 
-// Hjälpmetoder för lösenordshashning (PBKDF2/Rfc2898)
-string HashPassword(string password)
-{
-    const int iterations = 100_000;
-    var salt = RandomNumberGenerator.GetBytes(16);
-    using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
-    var hash = pbkdf2.GetBytes(32);
-    return $"{iterations}:{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
-}
+// Hjï¿½lpmetoder fï¿½r lï¿½senordshashning (PBKDF2/Rfc2898)
 
-// Verifierar ett lösenord mot den sparade salt+hash-strängen i konstant tid.
-bool VerifyPassword(string password, string storedHash)
-{
-    try
-    {
-        var parts = storedHash.Split(':');
-        if (parts.Length != 3) return false;
-        var iterations = int.Parse(parts[0]);
-        var salt = Convert.FromBase64String(parts[1]);
-        var hash = Convert.FromBase64String(parts[2]);
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
-        var computed = pbkdf2.GetBytes(hash.Length);
-        return CryptographicOperations.FixedTimeEquals(computed, hash);
-    }
-    catch
-    {
-        return false;
-    }
-}
-
-// Lägger till en ny kund efter enklare validering av inmatade värden.
+// Lï¿½gger till en ny kund efter enklare validering av inmatade vï¿½rden.
 async Task AddCustomer()
 {
     Console.Write("First name: ");
@@ -135,7 +112,7 @@ async Task AddCustomer()
     Console.Write("Password: ");
     var password = (Console.ReadLine() ?? string.Empty).Trim();
 
-    // Grundläggande validering
+    // Grundlï¿½ggande validering
     if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(last) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
     {
         Console.WriteLine("All fields are required.");
@@ -150,15 +127,15 @@ async Task AddCustomer()
         CustomerName = first,
         LastName = last,
         Email = email,
-        // Spara lösenordet som en salt+hash-sträng
-        PasswordHash = HashPassword(password)
+        // Spara lï¿½senordet som en salt+hash-strï¿½ng
+        PasswordHash = PasswordHasher.Hash(password)
     };
     ctx.Customers.Add(c);
     try { await ctx.SaveChangesAsync(); Console.WriteLine("Customer added."); }
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Redigera en befintlig kund: mata in nya värden eller lämna blankt för att behålla.
+// Redigera en befintlig kund: mata in nya vï¿½rden eller lï¿½mna blankt fï¿½r att behï¿½lla.
 async Task EditCustomer()
 {
     Console.Write("CustomerId to edit: ");
@@ -171,15 +148,15 @@ async Task EditCustomer()
     Console.Write("New last (blank to keep): "); var last = (Console.ReadLine() ?? string.Empty).Trim();
     Console.Write("New email (blank to keep): "); var email = (Console.ReadLine() ?? string.Empty).Trim();
     Console.Write("New password (blank to keep): "); var password = (Console.ReadLine() ?? string.Empty).Trim();
-    if (!string.IsNullOrEmpty(first)) c.CustomerName = first;
-    if (!string.IsNullOrEmpty(last)) c.LastName = last;
-    if (!string.IsNullOrEmpty(email)) { if (!email.Contains("@")) { Console.WriteLine("Invalid email"); return; } c.Email = email; }
-    if (!string.IsNullOrEmpty(password)) c.PasswordHash = HashPassword(password);
+    if (!string.IsNullOrEmpty(first)) { if (first.Length > 100) { Console.WriteLine("Name too long"); return; } c.CustomerName = first; }
+    if (!string.IsNullOrEmpty(last)) { if (last.Length > 100) { Console.WriteLine("Name too long"); return; } c.LastName = last; }
+    if (!string.IsNullOrEmpty(email)) { if (!email.Contains("@") || email.Length > 200) { Console.WriteLine("Invalid email"); return; } c.Email = email; }
+    if (!string.IsNullOrEmpty(password)) c.PasswordHash = PasswordHasher.Hash(password);
     try { await ctx.SaveChangesAsync(); Console.WriteLine("Updated"); }
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Tar bort kund efter bekräftelse.
+// Tar bort kund efter bekrï¿½ftelse.
 async Task DeleteCustomer()
 {
     Console.Write("CustomerId to delete: ");
@@ -225,12 +202,16 @@ async Task EditCategory()
     if (c == null) { Console.WriteLine("Not found"); return; }
     Console.WriteLine($"Editing {c.Name}");
     Console.Write("New name (blank to keep): "); var name = (Console.ReadLine() ?? string.Empty).Trim();
-    if (!string.IsNullOrEmpty(name)) c.Name = name;
+    if (!string.IsNullOrEmpty(name))
+    {
+        if (name.Length > 200) { Console.WriteLine("Name too long"); return; }
+        c.Name = name;
+    }
     try { await ctx.SaveChangesAsync(); Console.WriteLine("Updated"); }
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Tar bort en kategori efter bekräftelse
+// Tar bort en kategori efter bekrï¿½ftelse
 async Task DeleteCategory()
 {
     Console.Write("CategoryId to delete: ");
@@ -246,7 +227,6 @@ async Task DeleteCategory()
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// ----- Produkter -----
 async Task ProductsMenu()
 {
     while (true)
@@ -266,26 +246,38 @@ async Task ProductsMenu()
     }
 }
 
-// Redigera en produkt
 async Task EditProduct()
 {
     Console.Write("Product id to edit: ");
     if (!int.TryParse((Console.ReadLine() ?? string.Empty).Trim(), out var id)) { Console.WriteLine("Bad id"); return; }
     using var ctx = new WORK_Customer.ECommerceContext();
-    var p = await ctx.Products.FindAsync(id);
-    if (p == null) { Console.WriteLine("Not found"); return; }
-    Console.WriteLine($"Editing {p.name} | {p.price}");
+    var product = await ctx.Products.FindAsync(id);
+    if (product == null) { Console.WriteLine("Not found"); return; }
+    Console.WriteLine($"Editing {product.name} | {product.price}");
     Console.Write("New name (blank to keep): "); var name = (Console.ReadLine() ?? string.Empty).Trim();
-    Console.Write("New price (blank to keep): "); var pr = (Console.ReadLine() ?? string.Empty).Trim();
-    Console.Write("New category id (blank to keep): "); var cat = (Console.ReadLine() ?? string.Empty).Trim();
-    if (!string.IsNullOrEmpty(name)) p.name = name;
-    if (!string.IsNullOrEmpty(pr) && decimal.TryParse(pr, out var price) && price >= 0) p.price = price;
-    if (!string.IsNullOrEmpty(cat) && int.TryParse(cat, out var cid)) p.CategoryID = cid;
+    Console.Write("New price (blank to keep): "); var priceInput = (Console.ReadLine() ?? string.Empty).Trim();
+    Console.Write("New category id (blank to keep): "); var categoryInput = (Console.ReadLine() ?? string.Empty).Trim();
+    if (!string.IsNullOrEmpty(name))
+    {
+        if (name.Length > 200) { Console.WriteLine("Name too long"); return; }
+        product.name = name;
+    }
+    if (!string.IsNullOrEmpty(priceInput))
+    {
+        if (!decimal.TryParse(priceInput, out var price) || price < 0) { Console.WriteLine("Bad price"); return; }
+        product.price = price;
+    }
+    if (!string.IsNullOrEmpty(categoryInput))
+    {
+        if (!int.TryParse(categoryInput, out var categoryId)) { Console.WriteLine("Bad category id"); return; }
+        if (!await ctx.Categories.AnyAsync(c => c.CategoryId == categoryId)) { Console.WriteLine("Category not found"); return; }
+        product.CategoryID = categoryId;
+    }
     try { await ctx.SaveChangesAsync(); Console.WriteLine("Updated"); }
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
 }
 
-// Tar bort en produkt efter bekräftelse
+// Tar bort en produkt efter bekrï¿½ftelse
 async Task DeleteProduct()
 {
     Console.Write("Product id to delete: ");
@@ -321,12 +313,16 @@ async Task OrdersMenu()
     }
 }
 
-// Lista produkter och mät frågetiden
+// Lista produkter och mï¿½t frï¿½getiden
 async Task ListProducts() // overload used by menus
 {
     using var ctx = new WORK_Customer.ECommerceContext();
+    Console.Write("Search product name (blank for all): ");
+    var search = (Console.ReadLine() ?? string.Empty).Trim();
     var sw = System.Diagnostics.Stopwatch.StartNew();
-    var rows = await ctx.Products.AsNoTracking().OrderBy(p => p.id).ToListAsync();
+    var query = ctx.Products.AsNoTracking();
+    if (!string.IsNullOrWhiteSpace(search)) query = query.Where(p => p.name.Contains(search));
+    var rows = await query.OrderBy(p => p.id).ToListAsync();
     sw.Stop();
     foreach (var r in rows) Console.WriteLine($"{r.id} | {r.name} | {r.price} | Category {r.CategoryID}");
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
@@ -336,8 +332,13 @@ async Task ListProducts() // overload used by menus
 async Task ListOrders()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
+    Console.Write("Search customer name (blank for all): ");
+    var search = (Console.ReadLine() ?? string.Empty).Trim();
     var sw = System.Diagnostics.Stopwatch.StartNew();
-    var rows = await ctx.Orders.Include(o => o.Customer).AsNoTracking().OrderByDescending(o => o.CreatedAt).ToListAsync();
+    var query = ctx.Orders.Include(o => o.Customer).AsNoTracking();
+    if (!string.IsNullOrWhiteSpace(search))
+        query = query.Where(o => o.Customer.CustomerName.Contains(search) || o.Customer.LastName.Contains(search));
+    var rows = await query.OrderByDescending(o => o.CreatedAt).ToListAsync();
     sw.Stop();
     foreach (var r in rows) Console.WriteLine($"{r.OrderId} | {r.CreatedAt} | Customer {r.Customer.CustomerName} {r.Customer.LastName}");
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
@@ -361,7 +362,7 @@ async Task ViewOrder()
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
 }
 
-// Skapa order interaktivt genom att lägga till rader; spara i transaktion för att säkerställa konsistens
+// Skapa order interaktivt genom att lï¿½gga till rader; spara i transaktion fï¿½r att sï¿½kerstï¿½lla konsistens
 async Task AddOrder()
 {
     Console.Write("CustomerId for order: ");
@@ -373,7 +374,7 @@ async Task AddOrder()
 
     var order = new WORK_Customer.Order { CustomerId = custId, CreatedAt = DateTime.UtcNow };
 
-    // Samla orderrader från användaren
+    // Samla orderrader frï¿½n anvï¿½ndaren
     while (true)
     {
         Console.WriteLine("Available products:");
@@ -386,7 +387,7 @@ async Task AddOrder()
         if (prodIn.Equals("list", StringComparison.OrdinalIgnoreCase)) continue;
         if (!int.TryParse(prodIn, out var pid)) { Console.WriteLine("Bad id"); continue; }
 
-        // Hämta produkt utan tracking för att undvika konflikter med kontext
+        // Hï¿½mta produkt utan tracking fï¿½r att undvika konflikter med kontext
         var product = await ctx.Products.AsNoTracking().FirstOrDefaultAsync(x => x.id == pid);
         if (product == null) { Console.WriteLine("Product not found"); continue; }
         Console.WriteLine($"Selected product: {product.id} | {product.name} | {product.price}");
@@ -416,14 +417,14 @@ async Task AddOrder()
     }
 }
 
-// Rensa alla ordrar och orderrader (farlig operation, använd endast för test)
+// Rensa alla ordrar och orderrader (farlig operation, anvï¿½nd endast fï¿½r test)
 async Task ClearOrders()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
     using var tx = await ctx.Database.BeginTransactionAsync();
     try
     {
-        // Ta bort orderrader först, sedan ordrar
+        // Ta bort orderrader fï¿½rst, sedan ordrar
         var rows = ctx.OrderRows;
         ctx.OrderRows.RemoveRange(rows);
         await ctx.SaveChangesAsync();
@@ -442,12 +443,16 @@ async Task ClearOrders()
     }
 }
 
-// Hjälpfunktioner för kategorier och produkter
+// Hjï¿½lpfunktioner fï¿½r kategorier och produkter
 async Task ListCategories()
 {
     using var ctx = new WORK_Customer.ECommerceContext();
+    Console.Write("Search category name (blank for all): ");
+    var search = (Console.ReadLine() ?? string.Empty).Trim();
     var sw = System.Diagnostics.Stopwatch.StartNew();
-    var rows = await ctx.Categories.AsNoTracking().OrderBy(c => c.CategoryId).ToListAsync();
+    var query = ctx.Categories.AsNoTracking();
+    if (!string.IsNullOrWhiteSpace(search)) query = query.Where(c => c.Name.Contains(search));
+    var rows = await query.OrderBy(c => c.CategoryId).ToListAsync();
     sw.Stop();
     foreach (var r in rows) Console.WriteLine($"{r.CategoryId} | {r.Name}");
     Console.WriteLine($"Query time: {sw.ElapsedMilliseconds} ms");
@@ -472,12 +477,14 @@ async Task AddProduct()
 {
     Console.Write("Name: ");
     var name = (Console.ReadLine() ?? string.Empty).Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 200) { Console.WriteLine("Invalid product name"); return; }
     Console.Write("Price: ");
     var p = (Console.ReadLine() ?? string.Empty).Trim();
     if(!decimal.TryParse(p,out var price) || price < 0) { Console.WriteLine("Bad price"); return; }
     Console.Write("CategoryId: ");
     if(!int.TryParse((Console.ReadLine() ?? string.Empty).Trim(), out var cid)) { Console.WriteLine("Bad category id"); return; }
     using var ctx = new WORK_Customer.ECommerceContext();
+    if (!await ctx.Categories.AnyAsync(c => c.CategoryId == cid)) { Console.WriteLine("Category not found"); return; }
     ctx.Products.Add(new WORK_Customer.Product { name = name, price = price, CategoryID = cid });
     try { await ctx.SaveChangesAsync(); Console.WriteLine("Added product"); }
     catch (DbUpdateException ex) { Console.WriteLine("DB error: " + ex.GetBaseException().Message); }
