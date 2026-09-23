@@ -7,8 +7,8 @@ using WORK_Customer.Security;
 Console.WriteLine("DB: " + Path.Combine(AppContext.BaseDirectory, "ecommerce.db"));
 
 using var db = new WORK_Customer.ECommerceContext();
-// Ser till att databasen finns � skapar den automatiskt om den saknas. Praktiskt under utveckling.
-await db.Database.EnsureCreatedAsync();
+// Anv�nder EF Core-migrationer som den gemensamma k�llan f�r databasens schema.
+await db.Database.MigrateAsync();
 
 // Seed: l�gger till exempeldata i kategorier och produkter om tabellerna �r tomma.
 if (!await db.Categories.AnyAsync())
